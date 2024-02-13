@@ -13,17 +13,21 @@ use vmm::vmm_config::machine_config::VmConfig;
 use vmm::vmm_config::net::{NetBuilder, NetworkInterfaceConfig};
 use vmm::{EventManager, FcExitCode};
 
+pub struct NetConfig {
+    /// Name of an unused TAP interface on the host, must exist
+    tap_iface_name: String,
+    /// Mac address - Leave blank for a default
+    vm_mac: Option<[u8; 6]>,
+}
 pub struct Vm {
     vcpu_count: u8,
     mem_size_mib: usize,
     kernel_cmdline: String,
     kernel_path: PathBuf,
     rootfs_path: PathBuf,
+    extra_disks: Vec<PathBuf>,
     rootfs_readonly: bool,
-    /// Name of an unused TAP interface on the host, must exist
-    tap_iface_name: String,
-    /// Mac address - Leave blank for a default
-    vm_mac: Option<[u8; 6]>,
+    net_config: Option<NetConfig>,
 }
 
 impl Vm {
@@ -52,24 +56,29 @@ impl Vm {
             }),
         };
 
-        let mac = self.vm_mac.unwrap_or([0x0, 0x2, 0x0, 0x0, 0x0, 0x0]);
         let mut net_builder = NetBuilder::new();
-        net_builder
-            .build(NetworkInterfaceConfig {
-                iface_id: "net0".to_string(),
-                host_dev_name: self.tap_iface_name.clone(),
-                guest_mac: Some(MacAddr::from_bytes_unchecked(&mac)),
-                rx_rate_limiter: None,
-                tx_rate_limiter: None,
-            })
-            .unwrap();
+        match &self.net_config {
+            Some(nc) => {
+                let mac = nc.vm_mac.unwrap_or([0x0, 0x2, 0x0, 0x0, 0x0, 0x0]);
+                net_builder
+                    .build(NetworkInterfaceConfig {
+                        iface_id: "net0".to_string(),
+                        host_dev_name: nc.tap_iface_name.clone(),
+                        guest_mac: Some(MacAddr::from_bytes_unchecked(&mac)),
+                        rx_rate_limiter: None,
+                        tx_rate_limiter: None,
+                    })
+                    .unwrap();
+            }
+            None => (),
+        };
 
         let mut block = BlockBuilder::new();
         block
             .insert(BlockDeviceConfig {
-                drive_id: "block1".to_string(),
-                partuuid: None, //Some("0eaa91a0-01".to_string()),
-                is_root_device: false,
+                drive_id: "block0".to_string(),
+                partuuid: None,
+                is_root_device: true,
                 cache_type: CacheType::Unsafe,
 
                 is_read_only: Some(self.rootfs_readonly),
@@ -80,6 +89,25 @@ impl Vm {
                 socket: None,
             })
             .unwrap();
+
+        for (i, disk) in self.extra_disks.iter().enumerate() {
+            block
+                .insert(BlockDeviceConfig {
+                    drive_id: format!("block{}", i + 1),
+                    partuuid: None,
+                    is_root_device: false,
+                    cache_type: CacheType::Unsafe,
+
+                    is_read_only: Some(true),
+                    path_on_host: Some(disk.as_path().display().to_string()),
+                    rate_limiter: None,
+                    file_engine_type: None,
+
+                    socket: None,
+                })
+                .unwrap();
+        }
+
         let vm_resources = VmResources {
             vm_config,
             boot_source,
@@ -114,19 +142,37 @@ impl Vm {
 }
 #[cfg(test)]
 mod tests {
-    use crate::Vm;
+    use crate::{NetConfig, Vm};
     use std::path::PathBuf;
     #[test]
-    fn it_works() {
+    fn it_works_net() {
         let v = Vm {
             vcpu_count: 1,
             mem_size_mib: 32,
-            kernel_cmdline: "panic=-1 reboot=t root=/dev/vda init=/goinit".to_string(),
+            kernel_cmdline: "panic=-1 reboot=t init=/goinit".to_string(),
             kernel_path: PathBuf::from("/home/david/git/lk/vmlinux-mini-net"),
             rootfs_path: PathBuf::from("/home/david/git/lk/rootfs.ext4"),
             rootfs_readonly: false,
-            tap_iface_name: "mytap0".to_string(),
-            vm_mac: None,
+            extra_disks: vec![],
+            net_config: Some(NetConfig {
+                tap_iface_name: "mytap0".to_string(),
+                vm_mac: None,
+            }),
+        };
+        v.make().unwrap();
+    }
+
+    #[test]
+    fn it_works_disk() {
+        let v = Vm {
+            vcpu_count: 1,
+            mem_size_mib: 32,
+            kernel_cmdline: "panic=-1 reboot=t init=/goinit".to_string(),
+            kernel_path: PathBuf::from("/home/david/git/lk/vmlinux-mini-net"),
+            rootfs_path: PathBuf::from("/home/david/git/lk/rootfs.ext4"),
+            rootfs_readonly: false,
+            extra_disks: vec![PathBuf::from("/home/david/git/lk/disk.tar.gz")],
+            net_config: None,
         };
         v.make().unwrap();
     }
