@@ -13,6 +13,11 @@ use vmm::vmm_config::machine_config::VmConfig;
 use vmm::vmm_config::net::{NetBuilder, NetworkInterfaceConfig};
 use vmm::{EventManager, FcExitCode};
 
+pub struct Disk {
+    pub path: PathBuf,
+    pub read_only: bool,
+}
+
 pub struct NetConfig {
     /// Name of an unused TAP interface on the host, must exist
     pub tap_iface_name: String,
@@ -24,9 +29,8 @@ pub struct Vm {
     pub mem_size_mib: usize,
     pub kernel_cmdline: String,
     pub kernel_path: PathBuf,
-    pub rootfs_path: PathBuf,
-    pub extra_disks: Vec<PathBuf>,
-    pub rootfs_readonly: bool,
+    pub rootfs: Disk,
+    pub extra_disks: Vec<Disk>,
     pub net_config: Option<NetConfig>,
 }
 
@@ -81,8 +85,8 @@ impl Vm {
                 is_root_device: true,
                 cache_type: CacheType::Unsafe,
 
-                is_read_only: Some(self.rootfs_readonly),
-                path_on_host: Some(self.rootfs_path.as_path().display().to_string()),
+                is_read_only: Some(self.rootfs.read_only),
+                path_on_host: Some(self.rootfs.path.as_path().display().to_string()),
                 rate_limiter: None,
                 file_engine_type: None,
 
@@ -91,6 +95,7 @@ impl Vm {
             .unwrap();
 
         for (i, disk) in self.extra_disks.iter().enumerate() {
+            println!("adding disk {}", disk.path.as_path().display());
             block
                 .insert(BlockDeviceConfig {
                     drive_id: format!("block{}", i + 1),
@@ -98,8 +103,8 @@ impl Vm {
                     is_root_device: false,
                     cache_type: CacheType::Unsafe,
 
-                    is_read_only: Some(true),
-                    path_on_host: Some(disk.as_path().display().to_string()),
+                    is_read_only: Some(disk.read_only),
+                    path_on_host: Some(disk.path.as_path().display().to_string()),
                     rate_limiter: None,
                     file_engine_type: None,
 
@@ -142,7 +147,7 @@ impl Vm {
 }
 #[cfg(test)]
 mod tests {
-    use crate::{NetConfig, Vm};
+    use crate::{Disk, NetConfig, Vm};
     use std::path::PathBuf;
     #[test]
     fn it_works_net() {
@@ -151,8 +156,10 @@ mod tests {
             mem_size_mib: 32,
             kernel_cmdline: "panic=-1 reboot=t init=/goinit".to_string(),
             kernel_path: PathBuf::from("/home/david/git/lk/vmlinux-mini-net"),
-            rootfs_path: PathBuf::from("/home/david/git/lk/rootfs.ext4"),
-            rootfs_readonly: false,
+            rootfs: Disk {
+                path: PathBuf::from("/home/david/git/lk/rootfs.ext4"),
+                read_only: false,
+            },
             extra_disks: vec![],
             net_config: Some(NetConfig {
                 tap_iface_name: "mytap0".to_string(),
@@ -169,9 +176,14 @@ mod tests {
             mem_size_mib: 32,
             kernel_cmdline: "panic=-1 reboot=t init=/goinit".to_string(),
             kernel_path: PathBuf::from("/home/david/git/lk/vmlinux-mini-net"),
-            rootfs_path: PathBuf::from("/home/david/git/lk/rootfs.ext4"),
-            rootfs_readonly: false,
-            extra_disks: vec![PathBuf::from("/home/david/git/lk/disk.tar.gz")],
+            rootfs: Disk {
+                path: PathBuf::from("/home/david/git/lk/rootfs.ext4"),
+                read_only: false,
+            },
+            extra_disks: vec![Disk {
+                path: PathBuf::from("/home/david/git/lk/disk.tar.gz"),
+                read_only: true,
+            }],
             net_config: None,
         };
         v.make().unwrap();
