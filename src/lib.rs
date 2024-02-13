@@ -15,19 +15,19 @@ use vmm::{EventManager, FcExitCode};
 
 pub struct NetConfig {
     /// Name of an unused TAP interface on the host, must exist
-    tap_iface_name: String,
+    pub tap_iface_name: String,
     /// Mac address - Leave blank for a default
-    vm_mac: Option<[u8; 6]>,
+    pub vm_mac: Option<[u8; 6]>,
 }
 pub struct Vm {
-    vcpu_count: u8,
-    mem_size_mib: usize,
-    kernel_cmdline: String,
-    kernel_path: PathBuf,
-    rootfs_path: PathBuf,
-    extra_disks: Vec<PathBuf>,
-    rootfs_readonly: bool,
-    net_config: Option<NetConfig>,
+    pub vcpu_count: u8,
+    pub mem_size_mib: usize,
+    pub kernel_cmdline: String,
+    pub kernel_path: PathBuf,
+    pub rootfs_path: PathBuf,
+    pub extra_disks: Vec<PathBuf>,
+    pub rootfs_readonly: bool,
+    pub net_config: Option<NetConfig>,
 }
 
 impl Vm {
