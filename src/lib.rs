@@ -95,7 +95,6 @@ impl Vm {
             .unwrap();
 
         for (i, disk) in self.extra_disks.iter().enumerate() {
-            println!("adding disk {}", disk.path.as_path().display());
             block
                 .insert(BlockDeviceConfig {
                     drive_id: format!("block{}", i + 1),
