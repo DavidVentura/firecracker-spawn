@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fs::File;
 use std::path::PathBuf;
 use utils::net::mac::MacAddr;
-use vmm::builder::build_and_boot_microvm;
+use vmm::builder::build_microvm_for_boot;
 use vmm::devices::virtio::block_common::CacheType;
 use vmm::resources::VmResources;
 use vmm::seccomp_filters::get_empty_filters;
@@ -27,8 +27,8 @@ pub struct NetConfig {
 pub struct Vm {
     pub vcpu_count: u8,
     pub mem_size_mib: usize,
+    pub kernel: File,
     pub kernel_cmdline: String,
-    pub kernel_path: PathBuf,
     pub rootfs: Disk,
     pub extra_disks: Vec<Disk>,
     pub net_config: Option<NetConfig>,
@@ -55,7 +55,7 @@ impl Vm {
             config: BootSourceConfig::default(),
             builder: Some(BootConfig {
                 cmdline: linux_loader::cmdline::Cmdline::try_from(&self.kernel_cmdline, 4096)?,
-                kernel_file: File::open(&self.kernel_path)?,
+                kernel_file: self.kernel.try_clone()?,
                 initrd_file: None,
             }),
         };
@@ -124,12 +124,13 @@ impl Vm {
         let mut event_manager = EventManager::new().unwrap();
         let seccomp_filters = get_empty_filters();
 
-        let vm = build_and_boot_microvm(
+        let vm = build_microvm_for_boot(
             &instance_info,
             &vm_resources,
             &mut event_manager,
             &seccomp_filters,
         )?;
+        vm.lock().unwrap().resume_vm()?;
         loop {
             event_manager.run().unwrap();
             match vm.lock().unwrap().shutdown_exit_code() {
@@ -144,17 +145,20 @@ impl Vm {
         Ok(())
     }
 }
+
 #[cfg(test)]
 mod tests {
     use crate::{Disk, NetConfig, Vm};
+    use std::fs::File;
     use std::path::PathBuf;
     #[test]
     fn it_works_net() {
+        let kernel = File::open("/home/david/git/lk/vmlinux-mini-net").unwrap();
         let v = Vm {
             vcpu_count: 1,
             mem_size_mib: 32,
-            kernel_cmdline: "panic=-1 reboot=t init=/goinit".to_string(),
-            kernel_path: PathBuf::from("/home/david/git/lk/vmlinux-mini-net"),
+            kernel,
+            kernel_cmdline: "quiet panic=-1 reboot=t init=/goinit".to_string(),
             rootfs: Disk {
                 path: PathBuf::from("/home/david/git/lk/rootfs.ext4"),
                 read_only: false,
@@ -170,11 +174,12 @@ mod tests {
 
     #[test]
     fn it_works_disk() {
+        let kernel = File::open("/home/david/git/lk/vmlinux-mini-net").unwrap();
         let v = Vm {
             vcpu_count: 1,
             mem_size_mib: 32,
-            kernel_cmdline: "panic=-1 reboot=t init=/goinit".to_string(),
-            kernel_path: PathBuf::from("/home/david/git/lk/vmlinux-mini-net"),
+            kernel,
+            kernel_cmdline: "quiet panic=-1 reboot=t init=/goinit".to_string(),
             rootfs: Disk {
                 path: PathBuf::from("/home/david/git/lk/rootfs.ext4"),
                 read_only: false,
