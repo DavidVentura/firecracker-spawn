@@ -32,6 +32,7 @@ pub struct Vm {
     pub rootfs: Disk,
     pub extra_disks: Vec<Disk>,
     pub net_config: Option<NetConfig>,
+    pub use_hugepages: bool,
 }
 
 impl Vm {
@@ -49,7 +50,7 @@ impl Vm {
             smt: false,
             cpu_template: None,
             track_dirty_pages: false,
-            backed_by_hugepages: true,
+            backed_by_hugepages: self.use_hugepages,
         };
         let boot_source = BootSource {
             config: BootSourceConfig::default(),
@@ -168,6 +169,7 @@ mod tests {
                 tap_iface_name: "mytap0".to_string(),
                 vm_mac: None,
             }),
+            use_hugepages: false,
         };
         v.make().unwrap();
     }
@@ -189,6 +191,7 @@ mod tests {
                 read_only: true,
             }],
             net_config: None,
+            use_hugepages: false,
         };
         v.make().unwrap();
     }
