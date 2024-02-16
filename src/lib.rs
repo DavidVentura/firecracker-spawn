@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use utils::net::mac::MacAddr;
 use vmm::builder::build_microvm_for_boot;
 use vmm::devices::virtio::block_common::CacheType;
+pub use vmm::devices::legacy::serial::SerialOut;
 use vmm::resources::VmResources;
 use vmm::seccomp_filters::get_empty_filters;
 use vmm::vmm_config::boot_source::{BootConfig, BootSource, BootSourceConfig};
@@ -36,7 +37,7 @@ pub struct Vm {
 }
 
 impl Vm {
-    pub fn make(&self) -> Result<(), Box<dyn Error>> {
+    pub fn make(&self, output: Box<dyn SerialOut>) -> Result<(), Box<dyn Error>> {
         let instance_info = InstanceInfo {
             id: "anonymous-instance".to_string(),
             state: VmState::NotStarted,
@@ -130,6 +131,7 @@ impl Vm {
             &vm_resources,
             &mut event_manager,
             &seccomp_filters,
+            output,
         )?;
         vm.lock().unwrap().resume_vm()?;
         loop {
@@ -151,6 +153,7 @@ impl Vm {
 mod tests {
     use crate::{Disk, NetConfig, Vm};
     use std::fs::File;
+    use std::io;
     use std::path::PathBuf;
     #[test]
     fn it_works_net() {
@@ -171,7 +174,7 @@ mod tests {
             }),
             use_hugepages: false,
         };
-        v.make().unwrap();
+        v.make(Box::new(io::sink())).unwrap();
     }
 
     #[test]
@@ -193,6 +196,6 @@ mod tests {
             net_config: None,
             use_hugepages: false,
         };
-        v.make().unwrap();
+        v.make(Box::new(io::sink())).unwrap();
     }
 }
