@@ -9,8 +9,10 @@ readme = "README.md"
 [dependencies]
 kvm-bindings = { version = "0.7.0", features = ["fam-wrappers"] }
 linux-loader = "0.10.0"
-vmm = { git = "https://github.com/DavidVentura/firecracker.git", branch = "hugepages-minimal" }
-utils = { git = "https://github.com/DavidVentura/firecracker.git", branch = "hugepages-minimal" }
+vmm = { git = "https://github.com/DavidVentura/firecracker.git", branch = "serial-only" }
+utils = { git = "https://github.com/DavidVentura/firecracker.git", branch = "serial-only" }
+#vmm = { path = "/home/david/git/firecracker/src/vmm" }
+#utils = { path = "/home/david/git/firecracker/src/utils" }
 
 [patch.crates-io]
 kvm-bindings = { git = "https://github.com/firecracker-microvm/kvm-bindings", tag = "v0.7.0-2", features = ["fam-wrappers"] }

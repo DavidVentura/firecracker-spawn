@@ -670,7 +670,7 @@ checksum = "f98d2aa92eebf49b69786be48e4477826b256916e84a57ff2a4f21923b48eb4c"
 [[package]]
 name = "seccompiler"
 version = "1.7.0-dev"
-source = "git+https://github.com/DavidVentura/firecracker.git?branch=hugepages-minimal#9f5b70d22f7c82e2cc0a67fc0f54d43acefffe8f"
+source = "git+https://github.com/DavidVentura/firecracker.git?branch=serial-only#6124a575c9ae70e18791407738cec7fec8b22917"
 dependencies = [
  "bincode",
  "displaydoc",
@@ -864,7 +864,7 @@ dependencies = [
 [[package]]
 name = "utils"
 version = "0.1.0"
-source = "git+https://github.com/DavidVentura/firecracker.git?branch=hugepages-minimal#9f5b70d22f7c82e2cc0a67fc0f54d43acefffe8f"
+source = "git+https://github.com/DavidVentura/firecracker.git?branch=serial-only#6124a575c9ae70e18791407738cec7fec8b22917"
 dependencies = [
  "derive_more",
  "displaydoc",
@@ -940,7 +940,7 @@ checksum = "6de3dc0146d78558327419fac388850fc6cbf197e924c4659a4863db20b5af64"
 [[package]]
 name = "vmm"
 version = "0.1.0"
-source = "git+https://github.com/DavidVentura/firecracker.git?branch=hugepages-minimal#9f5b70d22f7c82e2cc0a67fc0f54d43acefffe8f"
+source = "git+https://github.com/DavidVentura/firecracker.git?branch=serial-only#6124a575c9ae70e18791407738cec7fec8b22917"
 dependencies = [
  "aes-gcm",
  "aws-lc-rs",

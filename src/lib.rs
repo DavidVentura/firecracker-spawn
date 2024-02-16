@@ -3,13 +3,14 @@ use std::fs::File;
 use std::path::PathBuf;
 use utils::net::mac::MacAddr;
 use vmm::builder::build_microvm_for_boot;
-use vmm::devices::virtio::block_common::CacheType;
 pub use vmm::devices::legacy::serial::SerialOut;
+use vmm::devices::virtio::block::CacheType;
 use vmm::resources::VmResources;
 use vmm::seccomp_filters::get_empty_filters;
 use vmm::vmm_config::boot_source::{BootConfig, BootSource, BootSourceConfig};
 use vmm::vmm_config::drive::{BlockBuilder, BlockDeviceConfig};
 use vmm::vmm_config::instance_info::{InstanceInfo, VmState};
+use vmm::vmm_config::machine_config::HugePageConfig;
 use vmm::vmm_config::machine_config::VmConfig;
 use vmm::vmm_config::net::{NetBuilder, NetworkInterfaceConfig};
 use vmm::{EventManager, FcExitCode};
@@ -51,7 +52,11 @@ impl Vm {
             smt: false,
             cpu_template: None,
             track_dirty_pages: false,
-            backed_by_hugepages: self.use_hugepages,
+            huge_pages: if self.use_hugepages {
+                HugePageConfig::Hugetlbfs2M
+            } else {
+                HugePageConfig::None
+            },
         };
         let boot_source = BootSource {
             config: BootSourceConfig::default(),
