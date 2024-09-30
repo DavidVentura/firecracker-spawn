@@ -188,6 +188,7 @@ mod tests {
     use std::path::PathBuf;
     use std::{io, thread};
     use test_binary::TestBinary;
+
     #[test]
     fn it_works_net() {
         let kernel = File::open("vmlinux").unwrap();
@@ -266,7 +267,6 @@ mod tests {
             .with_target("x86_64-unknown-linux-musl")
             .build()
             .unwrap();
-            println!("tbp {test_bin_path:?}");
             let init_bytes = fs::read(test_bin_path).unwrap();
             let mut outf = File::create(cpio_path).unwrap();
 
@@ -321,10 +321,7 @@ mod tests {
                 }
             }
         });
-        println!("made vm");
-        //v.make(Box::new(io::stdout())).unwrap();
         v.make(Box::new(io::sink())).unwrap();
-        println!("waiting for thread now");
         handle.join().unwrap();
     }
 }
