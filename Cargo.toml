@@ -16,3 +16,8 @@ utils = { git = "https://github.com/DavidVentura/firecracker.git", branch = "ser
 
 [patch.crates-io]
 kvm-bindings = { git = "https://github.com/firecracker-microvm/kvm-bindings", tag = "v0.7.0-2", features = ["fam-wrappers"] }
+
+[dev-dependencies]
+cpio = "0.4.0"
+#test-binary = "3.0.2"
+test-binary = { git = "https://gitlab.com/davidv123/test-binary.git", branch = "main" }
