@@ -1,20 +1,21 @@
+use linux_loader;
 use std::error::Error;
 use std::fs::File;
 use std::path::PathBuf;
-use utils::net::mac::MacAddr;
+use std::sync::{Arc, Mutex};
 use vmm::builder::build_microvm_for_boot;
 pub use vmm::devices::legacy::serial::SerialOut;
 use vmm::devices::virtio::block::CacheType;
 use vmm::resources::VmResources;
-use vmm::seccomp_filters::get_empty_filters;
+use vmm::utils::net::mac::MacAddr;
 use vmm::vmm_config::boot_source::{BootConfig, BootSource, BootSourceConfig};
 use vmm::vmm_config::drive::{BlockBuilder, BlockDeviceConfig};
 use vmm::vmm_config::instance_info::{InstanceInfo, VmState};
 use vmm::vmm_config::machine_config::HugePageConfig;
-use vmm::vmm_config::machine_config::VmConfig;
+use vmm::vmm_config::machine_config::MachineConfig;
 use vmm::vmm_config::net::{NetBuilder, NetworkInterfaceConfig};
 use vmm::vmm_config::vsock::{VsockBuilder, VsockDeviceConfig};
-use vmm::{EventManager, FcExitCode};
+use vmm::{EventManager, FcExitCode, Vmm};
 
 #[derive(Clone)]
 pub struct Disk {
@@ -44,7 +45,7 @@ pub struct Vm {
 }
 
 impl Vm {
-    pub fn make(&self, output: Box<dyn SerialOut>) -> Result<(), Box<dyn Error>> {
+    pub fn make(&self, output: Box<dyn SerialOut>) -> Result<Arc<Mutex<Vmm>>, Box<dyn Error>> {
         let instance_info = InstanceInfo {
             id: "anonymous-instance".to_string(),
             state: VmState::NotStarted,
@@ -52,7 +53,7 @@ impl Vm {
             app_name: "cpu-template-helper".to_string(),
         };
 
-        let vm_config = VmConfig {
+        let machine_config = MachineConfig {
             vcpu_count: self.vcpu_count,
             mem_size_mib: self.mem_size_mib,
             smt: false,
@@ -97,38 +98,46 @@ impl Vm {
         let mut block = BlockBuilder::new();
 
         if let Some(rootfs) = &self.rootfs {
+            assert!(rootfs.path.exists());
             block
-                .insert(BlockDeviceConfig {
-                    drive_id: "block0".to_string(),
-                    partuuid: None,
-                    is_root_device: true,
-                    cache_type: CacheType::Unsafe,
+                .insert(
+                    BlockDeviceConfig {
+                        drive_id: "block0".to_string(),
+                        partuuid: None,
+                        is_root_device: true,
+                        cache_type: CacheType::Unsafe,
 
-                    is_read_only: Some(rootfs.read_only),
-                    path_on_host: Some(rootfs.path.as_path().display().to_string()),
-                    rate_limiter: None,
-                    file_engine_type: None,
+                        is_read_only: Some(rootfs.read_only),
+                        path_on_host: Some(rootfs.path.as_path().display().to_string()),
+                        rate_limiter: None,
+                        file_engine_type: None,
 
-                    socket: None,
-                })
+                        socket: None,
+                    },
+                    false,
+                )
                 .unwrap();
         };
 
         for (i, disk) in self.extra_disks.iter().enumerate() {
+            assert!(disk.path.exists());
             block
-                .insert(BlockDeviceConfig {
-                    drive_id: format!("block{}", i + 0),
-                    partuuid: None,
-                    is_root_device: false,
-                    cache_type: CacheType::Unsafe,
+                .insert(
+                    BlockDeviceConfig {
+                        drive_id: format!("block{}", i + 0),
+                        partuuid: None,
+                        is_root_device: false,
+                        cache_type: CacheType::Unsafe,
 
-                    is_read_only: Some(disk.read_only),
-                    path_on_host: Some(disk.path.as_path().display().to_string()),
-                    rate_limiter: None,
-                    file_engine_type: None,
+                        is_read_only: Some(disk.read_only),
+                        path_on_host: Some(disk.path.as_path().display().to_string()),
+                        rate_limiter: None,
+                        file_engine_type: None,
 
-                    socket: None,
-                })
+                        socket: None,
+                    },
+                    false,
+                )
                 .unwrap();
         }
 
@@ -143,45 +152,43 @@ impl Vm {
         }
 
         let vm_resources = VmResources {
-            vm_config,
+            machine_config,
             boot_source,
             net_builder,
             block,
             boot_timer: false,
             vsock,
+            pci_enabled: true,
             ..Default::default()
         };
 
         let mut event_manager = EventManager::new().unwrap();
-        let seccomp_filters = get_empty_filters();
 
         let vm = build_microvm_for_boot(
             &instance_info,
             &vm_resources,
             &mut event_manager,
-            &seccomp_filters,
-            output,
+            Some(output),
         )?;
         vm.lock().unwrap().resume_vm()?;
         loop {
             event_manager.run().unwrap();
             match vm.lock().unwrap().shutdown_exit_code() {
                 Some(FcExitCode::Ok) => break,
-                Some(_) => {
-                    println!("vm died??");
-                    return Ok(());
+                Some(e) => {
+                    return Err(format!("Vm died? {e:?}").into());
                 }
                 None => continue,
             }
         }
-        Ok(())
+        Ok(vm)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{Disk, NetConfig, Vm};
-    use cpio::{newc, NewcBuilder};
+    use cpio::{NewcBuilder, newc};
     use std::fs::{self, File};
     use std::io::{Read, Write};
     use std::os::unix::net::UnixListener;
@@ -196,7 +203,7 @@ mod tests {
             vcpu_count: 1,
             mem_size_mib: 32,
             kernel,
-            kernel_cmdline: "quiet panic=-1 reboot=t init=/goinit".to_string(),
+            kernel_cmdline: "panic=-1 reboot=t init=/goinit".to_string(),
             rootfs: Some(Disk {
                 path: PathBuf::from("rootfs.ext4"),
                 read_only: false,

@@ -1,23 +1,28 @@
 [package]
 name = "firecracker-spawn"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 repository = "https://github.com/DavidVentura/firecracker-spawn"
 readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+resolver = "2"
 
 [dependencies]
-kvm-bindings = { version = "0.7.0", features = ["fam-wrappers"] }
-linux-loader = "0.10.0"
-vmm = { git = "https://github.com/DavidVentura/firecracker.git", branch = "serial-only" }
-utils = { git = "https://github.com/DavidVentura/firecracker.git", branch = "serial-only" }
-#vmm = { path = "/home/david/git/firecracker/src/vmm" }
-#utils = { path = "/home/david/git/firecracker/src/utils" }
+#kvm-bindings = { version = "0.7.0", features = ["fam-wrappers"] }
+linux-loader = "0.13.2"
+#vmm = { git = "https://github.com/DavidVentura/firecracker.git", branch = "serial-only" }
+#utils = { git = "https://github.com/DavidVentura/firecracker.git", branch = "serial-only" }
+vmm = { path = "/home/david/git/firecracker-new/src/vmm" }
+utils = { path = "/home/david/git/firecracker-new/src/utils" }
+vm-memory = "=0.17.1"
 
 [patch.crates-io]
+#vmm = { path = "/home/david/git/firecracker-new/src/vmm" }
+#utils = { path = "/home/david/git/firecracker-new/src/utils" }
+
 kvm-bindings = { git = "https://github.com/firecracker-microvm/kvm-bindings", tag = "v0.7.0-2", features = ["fam-wrappers"] }
 
 [dev-dependencies]
-cpio = "0.4.0"
+#cpio = "0.4.0"
 #test-binary = "3.0.2"
-test-binary = { git = "https://gitlab.com/davidv123/test-binary.git", branch = "main" }
+#test-binary = { git = "https://gitlab.com/davidv123/test-binary.git", branch = "main" }
