@@ -3,6 +3,7 @@ use std::error::Error;
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use vmm::builder::build_microvm_for_boot;
 pub use vmm::devices::legacy::serial::SerialOut;
 use vmm::devices::virtio::block::CacheType;
@@ -45,7 +46,11 @@ pub struct Vm {
 }
 
 impl Vm {
-    pub fn make(&self, output: Box<dyn SerialOut>) -> Result<Arc<Mutex<Vmm>>, Box<dyn Error>> {
+    pub fn make(
+        &self,
+        output: Box<dyn SerialOut>,
+        timeout: Option<Duration>,
+    ) -> Result<Arc<Mutex<Vmm>>, Box<dyn Error>> {
         let instance_info = InstanceInfo {
             id: "anonymous-instance".to_string(),
             state: VmState::NotStarted,
@@ -171,14 +176,31 @@ impl Vm {
             Some(output),
         )?;
         vm.lock().unwrap().resume_vm()?;
+        let start = Instant::now();
         loop {
-            event_manager.run().unwrap();
-            match vm.lock().unwrap().shutdown_exit_code() {
+            if let Some(t) = timeout {
+                let remaining = t.saturating_sub(start.elapsed());
+                event_manager
+                    .run_with_timeout(remaining.as_millis() as i32)
+                    .unwrap();
+            } else {
+                event_manager.run().unwrap();
+            };
+            let mut vm = vm.lock().unwrap();
+            match vm.shutdown_exit_code() {
                 Some(FcExitCode::Ok) => break,
+                Some(FcExitCode::GenericError) => {
+                    return Err("force-stopped".into());
+                }
                 Some(e) => {
                     return Err(format!("Vm died? {e:?}").into());
                 }
-                None => continue,
+                None => (),
+            };
+            if let Some(t) = timeout
+                && start.elapsed() > t
+            {
+                vm.stop(FcExitCode::GenericError);
             }
         }
         Ok(vm)
